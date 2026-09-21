@@ -1,12 +1,23 @@
 from fastapi import FastAPI
 from sqlalchemy import text
 
-from app.db.database import engine
+from app.db.database import engine, Base
+from app.models import (
+    User,
+    Case,
+    Evidence,
+    Theory,
+    Comment,
+    Vote
+)
 
 app = FastAPI(
     title="AfterWords API",
     version="1.0.0"
 )
+
+
+Base.metadata.create_all(bind=engine)
 
 
 @app.get("/")
