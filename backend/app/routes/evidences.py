@@ -10,10 +10,10 @@ router = APIRouter(tags=["Evidence"])
 
 # We have to add evidence to the cases
 @router.post("/cases/{case_id}/evidence", response_model = EvidenceResponse,status_code = status.HTTP_201_CREATED)
-def add_evidence(case_id: int, evidence_data: EvidenceCreateRequest, db:Session = Depends(get_db),current_uer:User = Depends(get_current_user)):
+def add_evidence(case_id: int, evidence_data: EvidenceCreateRequest, db:Session = Depends(get_db),current_user:User = Depends(get_current_user)):
 
     # Query database using case_Id
-    case = db.query(User).filter(Case.id == case_id).first()
+    case = db.query(Case).filter(Case.id == case_id).first()
 
     if case is None:
         raise HTTPException(
@@ -41,7 +41,7 @@ def add_evidence(case_id: int, evidence_data: EvidenceCreateRequest, db:Session 
 @router.get("/cases/{case_id}/evidence", response_model = list[EvidenceResponse])
 def get_case_evidence(case_id: int, db:Session = Depends(get_db)):
     # Whether case exists first
-    case = db.query(Case).filter(Case.id == case_id)
+    case = db.query(Case).filter(Case.id == case_id).first()
     if case is None:
         raise HTTPException(
             status_code = status.HTTP_404_NOT_FOUND,
