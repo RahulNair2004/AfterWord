@@ -15,6 +15,8 @@ from app.routes.users import router as users_router
 from app.routes.cases import router as cases_router
 from app.routes.evidences import router as evidence_router
 from app.routes.theory import router as theories_router
+from app.routes.comments import router as comments_router
+from app.routes.votes import router as votes_router
 
 
 app = FastAPI(
@@ -27,6 +29,8 @@ app.include_router(users_router)
 app.include_router(cases_router)
 app.include_router(evidence_router)
 app.include_router(theories_router)
+app.include_router(comments_router)
+app.include_router(votes_router)
 
 Base.metadata.create_all(bind=engine)
 
