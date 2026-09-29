@@ -8,7 +8,7 @@ from app.schemas.vote import VoteCreateRequest
 
 router = APIRouter(prefix="", tags=["Votes"])
 
-# 1. Cast or modify a vote (Protected)
+# Cast or modify a vote
 @router.post("/theories/{theory_id}/vote", status_code=status.HTTP_200_OK)
 def cast_vote(
     theory_id: int,
