@@ -1,6 +1,11 @@
 import os 
 from groq import Groq
 from dotenv import load_dotenv
+import json
+from sqlalchemy.orm import Session
+from app.services.AI.context import build_case_ai_context
+from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT
+from app.services.AI.schemas import CaseSummaryResponse
 
 # Load variables from .env files
 
@@ -42,6 +47,46 @@ def test_groq_connection(prompt: str) -> str:
 
     except Exception as e:
         return f"Groq Connection Error: {str(e)}"
+
+def generate_case_summary(case_id: int,db:Session):
+
+    # Fetch text profile from context layer
+    case_context = build_case_ai_context(case_id=case_id,db=db)
+
+    # Check if the case profile context exists
+    if case_context:
+        raise ValueError(f"Case with ID {case_id} was not found.")
+
+    # Formulating the explicit role instruction
+    completion = client.chat.completion.create(
+        model = GROQ_MODEL,
+        messages = [
+            {
+                "role":"system",
+                "content":CASE_SUMMARY_SYSTEM_PROMPT
+            },
+            {
+                "role":"user",
+                "content":case_context
+            }
+        ],
+        temperature = 0.3,
+
+        response_format = {"type":"json_object"}
+    )
+
+
+    # Extract JSON payload string response
+
+    json_string = completion.choices[0].message.content
+
+    # parsed data
+    parsed_data = json.load(json_string)
+
+    # Push data dictionary onto pydantic validator model
+    validated_response = CaseSummaryResponse(**parsed_data)
+
+    return validated_response
 
 if __name__ == "__main__":
 
