@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.services.AI.context import build_case_ai_context
 from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT
 from app.services.AI.schemas import CaseSummaryResponse
+from app.db.database import get_db
 
 # Load variables from .env files
 
@@ -48,17 +49,17 @@ def test_groq_connection(prompt: str) -> str:
     except Exception as e:
         return f"Groq Connection Error: {str(e)}"
 
-def generate_case_summary(case_id: int,db:Session):
+def generate_case_summary(case_id: int,db:Session) -> CaseSummaryResponse:
 
     # Fetch text profile from context layer
     case_context = build_case_ai_context(case_id=case_id,db=db)
 
     # Check if the case profile context exists
-    if case_context:
+    if not case_context:
         raise ValueError(f"Case with ID {case_id} was not found.")
 
     # Formulating the explicit role instruction
-    completion = client.chat.completion.create(
+    completion = client.chat.completions.create(
         model = GROQ_MODEL,
         messages = [
             {
@@ -70,18 +71,17 @@ def generate_case_summary(case_id: int,db:Session):
                 "content":case_context
             }
         ],
-        temperature = 0.3,
+        temperature = 0.2,
 
         response_format = {"type":"json_object"}
     )
 
 
     # Extract JSON payload string response
-
     json_string = completion.choices[0].message.content
 
     # parsed data
-    parsed_data = json.load(json_string)
+    parsed_data = json.loads(json_string)
 
     # Push data dictionary onto pydantic validator model
     validated_response = CaseSummaryResponse(**parsed_data)
@@ -90,9 +90,33 @@ def generate_case_summary(case_id: int,db:Session):
 
 if __name__ == "__main__":
 
-    print("Testing the Model")
+    print("Connecting to Postgresql")
+    db_generator = get_db()
+    db = next(db_generator)
 
-    test_prompt = "Explain what evidence means in an investigation in one sentence."
-    response = test_groq_connection(test_prompt)
+    TARGET_CASE_ID = 1
 
-    print(response)
+    try:
+        ai_response = generate_case_summary(case_id=TARGET_CASE_ID,db=db)
+
+        print(ai_response.summary)
+
+        for fact in ai_response.key_facts:
+            print(f"• {fact}")
+
+        for question in ai_response.unresolved_questions:
+            print(f"• {question}")
+    
+    except ValueError as ve:
+        print(f"\n Validation Error: {str(ve)}")
+
+    except Exception as e:
+        print(f"\nPipeline Crash Trace: {str(e)}")
+    
+    finally:
+        # 4. Clean up the database hook properly
+        try:
+            next(db_generator)
+        except StopIteration:
+            pass
+    
