@@ -17,7 +17,7 @@ from app.routes.evidences import router as evidence_router
 from app.routes.theory import router as theories_router
 from app.routes.comments import router as comments_router
 from app.routes.votes import router as votes_router
-
+from app.routes.ai import router as ai_router
 
 app = FastAPI(
     title="AfterWords API",
@@ -31,6 +31,7 @@ app.include_router(evidence_router)
 app.include_router(theories_router)
 app.include_router(comments_router)
 app.include_router(votes_router)
+app.include_router(ai_router)
 
 Base.metadata.create_all(bind=engine)
 

@@ -114,7 +114,7 @@ if __name__ == "__main__":
         print(f"\nPipeline Crash Trace: {str(e)}")
     
     finally:
-        # 4. Clean up the database hook properly
+        # Clean up the database hook properly
         try:
             next(db_generator)
         except StopIteration:
