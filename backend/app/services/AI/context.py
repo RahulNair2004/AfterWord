@@ -1,12 +1,13 @@
 from sqlalchemy.orm import Session
 from app.models import Case, Evidence, Theory
 
-def build_case_ai_context(case_id: int, db: Session):
+
+from typing import Optional,List
+def build_case_ai_context(case_id: int, db: Session) -> Optional[str]:
     """ Query db for specific case and collecting therories and evidence"""
     # Fetch the core case details
 
     case = db.query(Case).filter(Case.id == case_id).first()
-
     if not case:
         return None
 
@@ -43,12 +44,54 @@ def build_case_ai_context(case_id: int, db: Session):
 
     return context
 
-def build_evidence_ai_context(evidence_id: int,db: Session):
+def build_evidence_ai_context(evidence_id: int,db: Session) -> Optional[str]:
 
-    # Looki ng at the specific piece of evidence
+    # Looking at the specific piece of evidence
     evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
     if not evidence:
         return None
     
+    #  Looking up to the case using foriegn key relationship
+    case = db.query(Case).filter(Case.id == evidence.case_id).first()
+    if not case:
+        return None
 
-    # 
+    # Extracting historical surrounding clues and theories
+    other_evidence = db.query(Evidence).filter(
+        Evidence.case_id == case.id,
+        Evidence.id != evidence.id
+    ).all()
+
+    theories = db.query(Theory).filter(Theory.case_id == case.id).all()
+
+    # Structuring the available data 
+    context = "EVIDENCE PROFILE UNDER ANALYSIS\n"
+    context += f"Evidence ID: {evidence.id}\n"
+    context += f"Title: {evidence.title}\n"
+    context += f"Type: {evidence.evidence_type}\n"
+    context += f"Description: {evidence.description}\n\n"
+
+    context += "PARENT CASE CONTEXT\n"
+    context += f"Case ID: {case.id}\n"
+    context += f"Title: {case.title}\n"
+    context += f"Category: {case.category}\n"
+    context += f"Status: {case.status}\n"
+    context += f"Case Description: {case.description}\n\n"
+
+    context += "OTHER EVIDENCE SUBMITTED ON THIS CASE\n"
+    if not other_evidence:
+        context += "No other evidence has been logged for this case yet.\n"
+    else:
+        for idx, item in enumerate(other_evidence, 1):
+            context += f" Evidence #{idx} [{item.evidence_type}]: {item.title} = {item.description}\n"
+
+    context += "\n"
+
+    context += "EXISTING INVESTIGATOR THEORIES\n"
+    if not theories:
+        context+="No theories have been submitted by investigator."
+    else:
+        for idx,item in enumerate(theories,1):
+            context += f"Theory #{idx}: {item.content}\n"
+
+    return context
