@@ -42,3 +42,13 @@ def build_case_ai_context(case_id: int, db: Session):
             context += f"Theory {idx}:{item.content}\n"
 
     return context
+
+def build_evidence_ai_context(evidence_id: int,db: Session):
+
+    # Looki ng at the specific piece of evidence
+    evidence = db.query(Evidence).filter(Evidence.id == evidence_id).first()
+    if not evidence:
+        return None
+    
+
+    # 
