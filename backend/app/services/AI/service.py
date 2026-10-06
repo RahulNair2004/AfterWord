@@ -3,9 +3,9 @@ from groq import Groq
 from dotenv import load_dotenv
 import json
 from sqlalchemy.orm import Session
-from app.services.AI.context import build_case_ai_context
-from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT
-from app.services.AI.schemas import CaseSummaryResponse
+from app.services.AI.context import build_case_ai_context, build_evidence_ai_context
+from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT, EVIDENCE_ANALYSIS_SYSTEM_PROMPT
+from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse
 from app.db.database import get_db
 
 # Load variables from .env files
@@ -88,24 +88,58 @@ def generate_case_summary(case_id: int,db:Session) -> CaseSummaryResponse:
 
     return validated_response
 
+def generate_evidence_analysis(evidence_id: int, db: Session) -> EvidenceAnalysisResponse:
+
+    # Calling the context builder for evidence analysis
+    evidence_context = build_evidence_ai_context(evidence_id=evidence_id, db=db)
+
+    # Stop if context layer has empty srtings
+    if not evidence_context:
+        raise ValueError(f"Evidence with ID {evidence_id} was not found.")
+
+    # The LLM chat completion call
+    completion = client.chat.completions.create(
+        model = GROQ_MODEL,
+        messages = [
+            {"role": "system", "content": EVIDENCE_ANALYSIS_SYSTEM_PROMPT},
+            {"role": "user", "content": evidence_context}
+        ],
+        temperature = 0.2,
+        response_format = {"type":"json_object"}
+    )
+
+    # Extracting the JSON payload response
+    json_string = completion.choices[0].message.content
+
+    # Parsing the JSON string 
+    parsed_data = json.loads(json_string)
+
+    # Validating the parsed data 
+    validated_response  = EvidenceAnalysisResponse(**parsed_data)
+
+    return validated_response
+    
 if __name__ == "__main__":
 
     print("Connecting to Postgresql")
     db_generator = get_db()
     db = next(db_generator)
 
-    TARGET_CASE_ID = 1
+    TARGET_EVIDENCE_ID = 1
 
     try:
-        ai_response = generate_case_summary(case_id=TARGET_CASE_ID,db=db)
+        ai_response = generate_evidence_analysis(evidence_id=TARGET_EVIDENCE_ID, db=db)
 
         print(ai_response.summary)
-
-        for fact in ai_response.key_facts:
-            print(f"• {fact}")
-
-        for question in ai_response.unresolved_questions:
+        
+        print(ai_response.significance)
+        
+        for connection in ai_response.possible_connections:
+            print(f"• {connection}")
+            
+        for question in ai_response.questions:
             print(f"• {question}")
+            
     
     except ValueError as ve:
         print(f"\n Validation Error: {str(ve)}")
