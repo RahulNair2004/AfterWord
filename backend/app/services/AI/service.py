@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.services.AI.context import build_case_ai_context, build_evidence_ai_context, build_theory_ai_context, build_investigation_assistant_context, build_paradox_ai_context
 from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT, EVIDENCE_ANALYSIS_SYSTEM_PROMPT, THEORY_ANALYSIS_SYSTEM_PROMPT, INVESTIGATION_ASSISTANT_SYSTEM_PROMPT, PARADOX_AI_SYSTEM_PROMPT
 from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse, InvestigationAssistantResponse, InvestigationAssistantRequest, ParadoxMessage, ParadoxAIResponse
+from app.models.ai import AIAnalysis
 from app.db.database import get_db
 
 # Load variables from .env files
@@ -50,7 +51,7 @@ def test_groq_connection(prompt: str) -> str:
         return f"Groq Connection Error: {str(e)}"
 
 def generate_case_summary(case_id: int,db:Session) -> CaseSummaryResponse:
-
+    
     # Fetch text profile from context layer
     case_context = build_case_ai_context(case_id=case_id,db=db)
 
@@ -58,6 +59,19 @@ def generate_case_summary(case_id: int,db:Session) -> CaseSummaryResponse:
     if not case_context:
         raise ValueError(f"Case with ID {case_id} was not found.")
 
+    cached_summary = (
+    db.query(AIAnalysis)
+    .filter(
+        AIAnalysis.case_id == case_id,
+        AIAnalysis.analysis_type == "case_summary"
+    )
+    .first()
+)
+
+    if cached_summary:
+        return CaseSummaryResponse(**cached_summary.response)
+
+       
     # Formulating the explicit role instruction
     completion = client.chat.completions.create(
         model = GROQ_MODEL,
@@ -85,6 +99,22 @@ def generate_case_summary(case_id: int,db:Session) -> CaseSummaryResponse:
 
     # Push data dictionary onto pydantic validator model
     validated_response = CaseSummaryResponse(**parsed_data)
+
+    # Cache Insertion Phase
+    new_analysis = AIAnalysis(
+        case_id = case_id,
+        evidence_id=None,
+        theory_id=None,
+        analysis_type="case_summary",
+        response=validated_response.model_dump(),
+        model=GROQ_MODEL
+    )
+
+    db.add(new_analysis)
+
+    db.commit()
+
+    db.refresh(new_analysis)
 
     return validated_response
 

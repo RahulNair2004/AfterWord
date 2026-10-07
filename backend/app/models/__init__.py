@@ -4,3 +4,4 @@ from app.models.evidence import Evidence
 from app.models.theory import Theory
 from app.models.comment import Comment
 from app.models.vote import Vote
+from app.models.ai import AIAnalysis

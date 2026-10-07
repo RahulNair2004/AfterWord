@@ -13,6 +13,7 @@ router = APIRouter(prefix="/ai", tags=["AI"])
 @router.get("/cases/{case_id}/summary", response_model=CaseSummaryResponse)
 def get_case_summary(case_id: int, db: Session = Depends(get_db)):
     
+
     try:
         # Offload structural processing to your thin service engine
         summary_report = generate_case_summary(case_id=case_id, db=db)
