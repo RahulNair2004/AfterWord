@@ -23,4 +23,4 @@ class InvestigationAssistantResponse(BaseModel):
     follow_up_questions:list[str]
 
 class InvestigationAssistantRequest(BaseModel):
-    questions:str
+    question:str

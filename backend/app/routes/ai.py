@@ -82,7 +82,7 @@ def get_investigation_assistant(case_id: int,payload: InvestigationAssistantRequ
 
     try:
         # Structuring the context logic to this layer
-        investigation_report = generate_investigation_assistant(case_id=case_id, question=payload.questions,db=db)
+        investigation_report = generate_investigation_assistant(case_id=case_id, question=payload.question,db=db)
 
         return investigation_report
 
