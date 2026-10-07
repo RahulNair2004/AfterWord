@@ -16,3 +16,11 @@ class TheoryAnalysisResponse(BaseModel):
     supporting_evidence: list[str]
     contradictions: list[str]
     questions: list[str]
+
+class InvestigationAssistantResponse(BaseModel):
+    answer:str
+    key_points:list[str]
+    follow_up_questions:list[str]
+
+class InvestigationAssistantRequest(BaseModel):
+    questions:str

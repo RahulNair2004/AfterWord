@@ -118,7 +118,7 @@ def build_theory_ai_context(theory_id: int, db: Session) -> Optional[str]:
     # Fethcing all theories linked to this case
     theory_list = db.query(Theory).filter(Theory.case_id == case.id, Theory.id != theory.id).all()
 
-    # Consrtucting the context string 
+    # Constructing the context string
 
     context = "THEORY UNDER ANALYSIS\n"
     context += f"Theory ID: {theory.id}\n"
@@ -147,5 +147,49 @@ def build_theory_ai_context(theory_id: int, db: Session) -> Optional[str]:
     else:
         for idx, item in enumerate(theory_list, 1):
             context += f"Alternative Theory #{idx}: {item.content}\n"
+
+    return context
+
+def build_investigation_assistant_context(case_id: int, db: Session) -> Optional[str]:
+
+    # Fetching the case
+    case = db.query(Case).filter(Case.id == case_id).first()
+
+    # IF case is None return None
+    if not case:
+        return None
+
+    # Fetching all evidence linked to the case
+    evidence_list = db.query(Evidence).filter(Evidence.case_id == case.id).all()
+
+    # Fethcing theories linked to the case
+    theory_list = db.query(Theory).filter(Theory.case_id == case.id).all()
+
+    # Constructing the context string 
+
+    context = "CASE CONTEXT\n"
+    context += f"Case ID: {case.id}\n"
+    context += f"Title: {case.title}\n"
+    context += f"Category: {case.category}\n"
+    context += f"Status: {case.status}\n"
+    context += f"Description: {case.description}\n\n"
+
+    context += "EVIDENCE\n"
+    if not evidence_list:
+        context += "No evidence has been logged for this case yet.\n"
+    else:
+        for idx, item in enumerate(evidence_list, 1):
+            context += f"Evidence #{idx}\n"
+            context += f"Type: {item.evidence_type}\n"
+            context += f"Title: {item.title}\n"
+            context += f"Description: {item.description}\n\n"
+
+    context += "INVESTIGATOR THEORIES\n"
+    if not theory_list:
+        context += "No investigator theories have been submitted for this case yet.\n"
+    else:
+        for idx, item in enumerate(theory_list, 1):
+            context += f"Theory #{idx}\n"
+            context += f"Content: {item.content}\n\n"
 
     return context

@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.services.AI.service import generate_case_summary, generate_evidence_analysis, generate_theory_analysis
-from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse
+from app.services.AI.service import generate_case_summary, generate_evidence_analysis, generate_theory_analysis, generate_investigation_assistant
+from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse, InvestigationAssistantRequest, InvestigationAssistantResponse
 
 
 # Initialize router 
@@ -76,4 +76,24 @@ def get_theory_analysis(theory_id:int,db:Session = Depends(get_db)):
             detail = f"An unexpected error occurred during AI processing: {str(e)}"
         )
 
-    
+# Defining the endpoint for ai-generated investigation analysis
+@router.post("/cases/{case_id}/assistant",response_model = InvestigationAssistantResponse)
+def get_investigation_assistant(case_id: int,payload: InvestigationAssistantRequest, db:Session = Depends(get_db)):
+
+    try:
+        # Structuring the context logic to this layer
+        investigation_report = generate_investigation_assistant(case_id=case_id, question=payload.question,db=db)
+
+        return investigation_report
+
+    except ValueError as ve:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = str(ve)
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = f"An unexpected error occurred during AI processing: {str(e)}"
+        )

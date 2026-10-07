@@ -3,9 +3,9 @@ from groq import Groq
 from dotenv import load_dotenv
 import json
 from sqlalchemy.orm import Session
-from app.services.AI.context import build_case_ai_context, build_evidence_ai_context, build_theory_ai_context
-from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT, EVIDENCE_ANALYSIS_SYSTEM_PROMPT, THEORY_ANALYSIS_SYSTEM_PROMPT
-from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse
+from app.services.AI.context import build_case_ai_context, build_evidence_ai_context, build_theory_ai_context, build_investigation_assistant_context
+from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT, EVIDENCE_ANALYSIS_SYSTEM_PROMPT, THEORY_ANALYSIS_SYSTEM_PROMPT, INVESTIGATION_ASSISTANT_SYSTEM_PROMPT
+from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse, InvestigationAssistantResponse, InvestigationAssistantRequest
 from app.db.database import get_db
 
 # Load variables from .env files
@@ -150,6 +150,38 @@ def generate_theory_analysis(theory_id: int, db: Session) -> TheoryAnalysisRespo
 
     return validated_response
 
+def generate_investigation_assistant(case_id: int, question: str, db: Session) -> InvestigationAssistantResponse:
+
+    # Calling context builder
+    investigation_context = build_investigation_assistant_context(case_id=case_id, db=db)
+
+    # Stop if empty
+    if not investigation_context:
+        raise ValueError(f"Case with ID {case_id} not found.")
+
+    
+
+    completion = client.chat.completions.create(
+        model=GROQ_MODEL,
+        messages=[
+        {"role": "system", "content": INVESTIGATION_ASSISTANT_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                f"Case context:\n{investigation_context}\n\n"
+                f"Investigator question:\n{question}"
+            )
+        }
+    ],
+        temperature=0.2,
+        response_format={"type": "json_object"}
+    )
+
+    json_string = completion.choices[0].message.content
+    parsed_data = json.loads(json_string)
+    validated_response = InvestigationAssistantResponse(**parsed_data)
+
+    return validated_response
 
     
 if __name__ == "__main__":
@@ -158,27 +190,25 @@ if __name__ == "__main__":
     db_generator = get_db()
     db = next(db_generator)
 
-    TARGET_THEORY_ID = 1
+    TARGET_CASE_ID = 1 
+    INVESTIGATOR_QUESTION = "What evidence currently supports the broken window theory?"
 
     try:
-        ai_response = generate_theory_analysis(
-            theory_id=TARGET_THEORY_ID,
+        ai_response = generate_investigation_assistant(
+             case_id=TARGET_CASE_ID, 
+            question=INVESTIGATOR_QUESTION, 
             db=db
         )
 
-        print("\nSUMMARY:")
-        print(ai_response.summary)
+        print("\n ANSWER::")
+        print(ai_response.answer)
 
-        print("\nSUPPORTING EVIDENCE:")
-        for evidence in ai_response.supporting_evidence:
-            print(f"• {evidence}")
-
-        print("\nCONTRADICTIONS:")
-        for contradiction in ai_response.contradictions:
-            print(f"• {contradiction}")
+        print("\n RELEVANT KEY POINTS:")
+        for point in ai_response.key_points:
+            print(f"• {point}")
 
         print("\nQUESTIONS:")
-        for question in ai_response.questions:
+        for question in ai_response.follow_up_questions:
             print(f"• {question}")
 
     except ValueError as ve:
