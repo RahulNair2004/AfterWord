@@ -10,3 +10,9 @@ class EvidenceAnalysisResponse(BaseModel):
     significance: str
     possible_connections: list[str]
     questions: list[str]
+
+class TheoryAnalysisResponse(BaseModel):
+    summary: str
+    supporting_evidence: list[str]
+    contradictions: list[str]
+    questions: list[str]

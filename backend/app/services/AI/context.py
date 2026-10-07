@@ -95,3 +95,57 @@ def build_evidence_ai_context(evidence_id: int,db: Session) -> Optional[str]:
             context += f"Theory #{idx}: {item.content}\n"
 
     return context
+
+def build_theory_ai_context(theory_id: int, db: Session) -> Optional[str]:
+
+    # Fetching the theory
+    theory = db.query(Theory).filter(Theory.id == theory_id).first()
+
+    # If Theory does not exist,return None
+    if not theory:
+        return None
+
+    # Finding the Parent Case
+    case = db.query(Case).filter(Case.id == theory.case_id).first()
+
+    # If Case returns None
+    if not case:
+        return None
+
+    # Fetching evidence linked to this case and subsequent theories
+    evidence_list = db.query(Evidence).filter(Evidence.case_id == case.id).all()
+
+    # Fethcing all theories linked to this case
+    theory_list = db.query(Theory).filter(Theory.case_id == case.id, Theory.id != theory.id).all()
+
+    # Consrtucting the context string 
+
+    context = "THEORY UNDER ANALYSIS\n"
+    context += f"Theory ID: {theory.id}\n"
+    context += f"Theory Content: {theory.content}\n\n"
+
+    context += "PARENT CASE CONTEXT\n"
+    context += f"Case ID: {case.id}\n"
+    context += f"Title: {case.title}\n"
+    context += f"Category: {case.category}\n"
+    context += f"Status: {case.status}\n"
+    context += f"Case Description: {case.description}\n\n"
+
+    context += "CASE EVIDENCE\n"
+    if not evidence_list:
+        context += "No evidence has been logged for this case yet.\n"
+    else:
+        for idx, item in enumerate(evidence_list, 1):
+            context += f"Evidence #{idx} [{item.evidence_type}]: {item.title}\n"
+            context += f"Details: {item.description}\n\n"
+
+    context += "\n"
+
+    context += "OTHER INVESTIGATOR THEORIES\n"
+    if not theory_list:
+        context += "No alternative theories have been submitted by other investigators yet.\n"
+    else:
+        for idx, item in enumerate(theory_list, 1):
+            context += f"Alternative Theory #{idx}: {item.content}\n"
+
+    return context

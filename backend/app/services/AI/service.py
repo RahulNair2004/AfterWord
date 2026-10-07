@@ -3,9 +3,9 @@ from groq import Groq
 from dotenv import load_dotenv
 import json
 from sqlalchemy.orm import Session
-from app.services.AI.context import build_case_ai_context, build_evidence_ai_context
-from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT, EVIDENCE_ANALYSIS_SYSTEM_PROMPT
-from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse
+from app.services.AI.context import build_case_ai_context, build_evidence_ai_context, build_theory_ai_context
+from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT, EVIDENCE_ANALYSIS_SYSTEM_PROMPT, THEORY_ANALYSIS_SYSTEM_PROMPT
+from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse
 from app.db.database import get_db
 
 # Load variables from .env files
@@ -118,6 +118,39 @@ def generate_evidence_analysis(evidence_id: int, db: Session) -> EvidenceAnalysi
     validated_response  = EvidenceAnalysisResponse(**parsed_data)
 
     return validated_response
+
+def generate_theory_analysis(theory_id: int, db: Session) -> TheoryAnalysisResponse:
+
+    # Calling the context builder for theory analysis
+    theory_context = build_theory_ai_context(theory_id = theory_id, db = db)
+
+    # Stop if context layer has empty strings
+    if not theory_context:
+        raise ValueError(f"Theory with ID {theory_id} was not found.")
+
+    # LLM chat ccompletion call
+    completion = client.chat.completions.create(
+        model = GROQ_MODEL,
+        messages = [
+            {"role":"system","content":THEORY_ANALYSIS_SYSTEM_PROMPT},
+            {"role":"user","content":theory_context}
+        ],
+        temperature = 0.2,
+        response_format = {"type":"json_object"}
+    )
+
+    # Extracting the JSON payload response
+    json_string  = completion.choices[0].message.content
+
+    # Parsing the JSON string
+    parsed_string = json.loads(json_string)
+
+    # Validating the parsed string
+    validated_response = TheoryAnalysisResponse(**parsed_string)
+
+    return validated_response
+
+
     
 if __name__ == "__main__":
 
@@ -125,32 +158,38 @@ if __name__ == "__main__":
     db_generator = get_db()
     db = next(db_generator)
 
-    TARGET_EVIDENCE_ID = 1
+    TARGET_THEORY_ID = 1
 
     try:
-        ai_response = generate_evidence_analysis(evidence_id=TARGET_EVIDENCE_ID, db=db)
+        ai_response = generate_theory_analysis(
+            theory_id=TARGET_THEORY_ID,
+            db=db
+        )
 
+        print("\nSUMMARY:")
         print(ai_response.summary)
-        
-        print(ai_response.significance)
-        
-        for connection in ai_response.possible_connections:
-            print(f"• {connection}")
-            
+
+        print("\nSUPPORTING EVIDENCE:")
+        for evidence in ai_response.supporting_evidence:
+            print(f"• {evidence}")
+
+        print("\nCONTRADICTIONS:")
+        for contradiction in ai_response.contradictions:
+            print(f"• {contradiction}")
+
+        print("\nQUESTIONS:")
         for question in ai_response.questions:
             print(f"• {question}")
-            
-    
+
     except ValueError as ve:
-        print(f"\n Validation Error: {str(ve)}")
+        print(f"\nValidation Error: {str(ve)}")
 
     except Exception as e:
         print(f"\nPipeline Crash Trace: {str(e)}")
-    
+
     finally:
         # Clean up the database hook properly
         try:
             next(db_generator)
         except StopIteration:
             pass
-    

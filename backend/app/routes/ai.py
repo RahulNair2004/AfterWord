@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.services.AI.service import generate_case_summary, generate_evidence_analysis
-from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse
+from app.services.AI.service import generate_case_summary, generate_evidence_analysis, generate_theory_analysis
+from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse
 
 
 # Initialize router 
@@ -53,3 +53,27 @@ def get_evidence_analysis(evidence_id:int,db:Session = Depends(get_db)):
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexcpected error occured during AI processing {str(e)}"
         )
+
+# Defining endpoints for ai-generated theory analysis
+@router.get("/theories/{theory_id}/analysis",response_model = TheoryAnalysisResponse)
+def get_theory_analysis(theory_id:int,db:Session = Depends(get_db)):
+
+    try:
+        # Offloading structured logic to this layer
+        theory_report = generate_theory_analysis(theory_id = theory_id, db=db)
+
+        return theory_report
+
+    except ValueError as ve:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = str(ve)
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = f"An unexpected error occurred during AI processing: {str(e)}"
+        )
+
+    
