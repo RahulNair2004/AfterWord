@@ -24,3 +24,13 @@ class InvestigationAssistantResponse(BaseModel):
 
 class InvestigationAssistantRequest(BaseModel):
     question:str
+
+class ParadoxMessage(BaseModel):
+    role: str
+    content: str
+
+class ParadoxAIResponse(BaseModel):
+    challenge: str
+    alternative_explanations: list[str]
+    supporting_points: list[str]
+    counter_questions: list[str]

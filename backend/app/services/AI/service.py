@@ -3,9 +3,9 @@ from groq import Groq
 from dotenv import load_dotenv
 import json
 from sqlalchemy.orm import Session
-from app.services.AI.context import build_case_ai_context, build_evidence_ai_context, build_theory_ai_context, build_investigation_assistant_context
-from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT, EVIDENCE_ANALYSIS_SYSTEM_PROMPT, THEORY_ANALYSIS_SYSTEM_PROMPT, INVESTIGATION_ASSISTANT_SYSTEM_PROMPT
-from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse, InvestigationAssistantResponse, InvestigationAssistantRequest
+from app.services.AI.context import build_case_ai_context, build_evidence_ai_context, build_theory_ai_context, build_investigation_assistant_context, build_paradox_ai_context
+from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT, EVIDENCE_ANALYSIS_SYSTEM_PROMPT, THEORY_ANALYSIS_SYSTEM_PROMPT, INVESTIGATION_ASSISTANT_SYSTEM_PROMPT, PARADOX_AI_SYSTEM_PROMPT
+from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse, InvestigationAssistantResponse, InvestigationAssistantRequest, ParadoxMessage, ParadoxAIResponse
 from app.db.database import get_db
 
 # Load variables from .env files
@@ -183,32 +183,82 @@ def generate_investigation_assistant(case_id: int, question: str, db: Session) -
 
     return validated_response
 
-    
-if __name__ == "__main__":
+def generate_paradox_ai(case_id: int,messages: list[ParadoxMessage],db: Session) -> ParadoxAIResponse:
 
+    # Calling the context builder
+    paradox_context = build_paradox_ai_context(case_id = case_id, messages = messages,db= db)
+
+    # If empty Stop
+    if not paradox_context:
+        raise ValueError(f"Case with ID {case_id} not found.")    
+
+    completion = client.chat.completions.create(
+        model = GROQ_MODEL,
+        messages = [
+            {"role":"system","content":PARADOX_AI_SYSTEM_PROMPT},
+            {"role":"user","content":paradox_context}
+        ],
+        temperature =0.2,
+        response_format = {"type":"json_object"}
+    )
+
+    # Extracting the JSON payload response
+    json_string = completion.choices[0].message.content
+
+    # Parsing the JSON string
+    parsed_data = json.loads(json_string)
+
+    # Validating the parsed string 
+    validated_response = ParadoxAIResponse(**parsed_data)
+    return validated_response
+
+
+if __name__ == "__main__":
     print("Connecting to Postgresql")
+
     db_generator = get_db()
     db = next(db_generator)
 
-    TARGET_CASE_ID = 1 
-    INVESTIGATOR_QUESTION = "What evidence currently supports the broken window theory?"
+    TARGET_CASE_ID = 1
+
+    messages = [
+        ParadoxMessage(
+            role="user",
+            content="The thief definitely entered through the broken window."
+        ),
+        ParadoxMessage(
+            role="assistant",
+            content=(
+                "The broken window may support that possibility, "
+                "but the available evidence does not establish that it was the entry point."
+            )
+        ),
+        ParadoxMessage(
+            role="user",
+            content="But the room was locked, so the window must have been used."
+        )
+    ]
 
     try:
-        ai_response = generate_investigation_assistant(
-             case_id=TARGET_CASE_ID, 
-            question=INVESTIGATOR_QUESTION, 
+        ai_response = generate_paradox_ai(
+            case_id=TARGET_CASE_ID,
+            messages=messages,
             db=db
         )
 
-        print("\n ANSWER::")
-        print(ai_response.answer)
+        print("\nCHALLENGE:")
+        print(ai_response.challenge)
 
-        print("\n RELEVANT KEY POINTS:")
-        for point in ai_response.key_points:
+        print("\nALTERNATIVE EXPLANATIONS:")
+        for explanation in ai_response.alternative_explanations:
+            print(f"• {explanation}")
+
+        print("\nSUPPORTING POINTS:")
+        for point in ai_response.supporting_points:
             print(f"• {point}")
 
-        print("\nQUESTIONS:")
-        for question in ai_response.follow_up_questions:
+        print("\nCOUNTER QUESTIONS:")
+        for question in ai_response.counter_questions:
             print(f"• {question}")
 
     except ValueError as ve:
@@ -218,7 +268,6 @@ if __name__ == "__main__":
         print(f"\nPipeline Crash Trace: {str(e)}")
 
     finally:
-        # Clean up the database hook properly
         try:
             next(db_generator)
         except StopIteration:

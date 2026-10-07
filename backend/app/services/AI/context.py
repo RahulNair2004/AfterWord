@@ -1,8 +1,9 @@
 from sqlalchemy.orm import Session
 from app.models import Case, Evidence, Theory
-
+from app.services.AI.schemas import ParadoxMessage
 
 from typing import Optional,List
+
 def build_case_ai_context(case_id: int, db: Session) -> Optional[str]:
     """ Query db for specific case and collecting therories and evidence"""
     # Fetch the core case details
@@ -193,3 +194,53 @@ def build_investigation_assistant_context(case_id: int, db: Session) -> Optional
             context += f"Content: {item.content}\n\n"
 
     return context
+
+def build_paradox_ai_context(case_id: int,messages: list[ParadoxMessage],db:Session) -> Optional[str]:
+
+    # Fetching the case
+    case = db.query(Case).filter(Case.id == case_id).first()
+
+    # If case is None return None
+    if not case:
+        return None
+
+    # Gather Evidence
+    evidence_list = db.query(Evidence).filter(Evidence.case_id == case.id).all()
+
+    # Gather Theories
+    theory_list = db.query(Theory).filter(Theory.case_id == case.id).all()
+
+    # Constructing the context string 
+    context = "CASE CONTEXT\n"
+    context += f"Case ID: {case.id}\n"
+    context += f"Title: {case.title}\n"
+    context += f"Category: {case.category}\n"
+    context += f"Status: {case.status}\n"
+    context += f"Description: {case.description}\n\n"
+
+    context += "EVIDENCE\n"
+    if not evidence_list:
+        context += "No evidence has been logged for this case yet.\n"
+    else:
+        for idx, item in enumerate(evidence_list, 1):
+            context += f"Evidence #{idx} [{item.evidence_type}]: {item.title}\n"
+            context += f"Details: {item.description}\n\n"
+
+    context += "INVESTIGATOR THEORIES\n"
+    if not theory_list:
+        context += "No investigator theories have been submitted for this case yet.\n"
+    else:
+        for idx, item in enumerate(theory_list, 1):
+            context += f"Theory #{idx}: {item.content}\n\n"
+
+    # Adding the paradox messages to the context
+    context += "PARADOX MESSAGES\n"
+    if not messages:
+        context += "No active conversations history provided for this case.\n"
+    else:
+        for msg in messages:
+            speaker = "User" if msg.role == "user" else "Assistant"
+            context += f"{speaker}: {msg.content}\n"
+
+    return context
+

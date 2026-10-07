@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.services.AI.service import generate_case_summary, generate_evidence_analysis, generate_theory_analysis, generate_investigation_assistant
-from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse, InvestigationAssistantRequest, InvestigationAssistantResponse
+from app.services.AI.service import generate_case_summary, generate_evidence_analysis, generate_theory_analysis, generate_investigation_assistant, generate_paradox_ai
+from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse, InvestigationAssistantRequest, InvestigationAssistantResponse, ParadoxMessage, ParadoxAIResponse
 
 
 # Initialize router 
@@ -96,4 +96,26 @@ def get_investigation_assistant(case_id: int,payload: InvestigationAssistantRequ
         raise HTTPException(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail = f"An unexpected error occurred during AI processing: {str(e)}"
+        )
+
+# Defining the endpoints for paradox ai analysis
+@router.post("/cases/{case_id}/paradox",response_model = ParadoxAIResponse)
+def get_paradox_ai(case_id: int, messages: list[ParadoxMessage], db:Session = Depends(get_db)):
+
+    try:
+        # Structuring the context logic to this layer
+        paradox_report = generate_paradox_ai(case_id = case_id,messages = messages, db=db)
+
+        return paradox_report
+    
+    except ValueError as ve:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = str(ve)
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = f"An unexpected error occurred during AI processing: {str(e)}."
         )
