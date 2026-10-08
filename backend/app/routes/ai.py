@@ -25,11 +25,18 @@ def get_case_summary(case_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(ve)
         )
-    except Exception as e:
+    
+    except RuntimeError as re:
+        raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=str(re)
+        )
+    
+    except Exception:
         # Prevent leaking connection drops while keeping a safe fallback
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred during AI processing: {str(e)}"
+            detail=f"An unexpected error occurred during AI processing"
         )
 
 # Defining endpoints for ai-generated evidence analysis
@@ -41,18 +48,23 @@ def get_evidence_analysis(evidence_id:int,db:Session = Depends(get_db)):
         analysis_report = generate_evidence_analysis(evidence_id = evidence_id,db=db)
 
         return analysis_report
+    
     except ValueError as ve:
         # Catching errors
         raise HTTPException(
             status_code = status.HTTP_404_NOT_FOUND,
             detail=str(ve)
         )
-
-    except Exception as e:
+    except RuntimeError as re:
+            raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(re)
+            )
+    except Exception:
         # Catchign unexpected errors
         raise HTTPException(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexcpected error occured during AI processing {str(e)}"
+            detail=f"An unexcpected error occured during AI processing."
         )
 
 # Defining endpoints for ai-generated theory analysis
@@ -70,11 +82,15 @@ def get_theory_analysis(theory_id:int,db:Session = Depends(get_db)):
             status_code = status.HTTP_404_NOT_FOUND,
             detail = str(ve)
         )
-
-    except Exception as e:
+    except RuntimeError as re:
+            raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(re)
+        )
+    except Exception:
         raise HTTPException(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail = f"An unexpected error occurred during AI processing: {str(e)}"
+            detail = f"An unexpected error occurred during AI processing."
         )
 
 # Defining the endpoint for ai-generated investigation analysis
@@ -92,11 +108,15 @@ def get_investigation_assistant(case_id: int,payload: InvestigationAssistantRequ
             status_code = status.HTTP_404_NOT_FOUND,
             detail = str(ve)
         )
-
-    except Exception as e:
+    except RuntimeError as re:
+            raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(re)
+        )
+    except Exception:
         raise HTTPException(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail = f"An unexpected error occurred during AI processing: {str(e)}"
+            detail = f"An unexpected error occurred during AI processing."
         )
 
 # Defining the endpoints for paradox ai analysis
@@ -114,9 +134,13 @@ def get_paradox_ai(case_id: int, messages: list[ParadoxMessage], db:Session = De
             status_code = status.HTTP_404_NOT_FOUND,
             detail = str(ve)
         )
-
-    except Exception as e:
+    except RuntimeError as re:
+            raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(re)
+        )
+    except Exception:
         raise HTTPException(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail = f"An unexpected error occurred during AI processing: {str(e)}."
+            detail = f"An unexpected error occurred during AI processing."
         )

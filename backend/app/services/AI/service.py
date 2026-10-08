@@ -10,7 +10,8 @@ from app.models.ai import AIAnalysis
 from app.db.database import get_db
 from app.models.evidence import Evidence
 from app.models.theory import Theory
-
+from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 # Load variables from .env files
 
 load_dotenv()
@@ -62,45 +63,58 @@ def generate_case_summary(case_id: int,db:Session) -> CaseSummaryResponse:
         raise ValueError(f"Case with ID {case_id} was not found.")
 
     cached_summary = (
-    db.query(AIAnalysis)
-    .filter(
-        AIAnalysis.case_id == case_id,
-        AIAnalysis.analysis_type == "case_summary"
+        db.query(AIAnalysis)
+        .filter(
+            AIAnalysis.case_id == case_id,
+            AIAnalysis.analysis_type == "case_summary"
+        )
+        .first()
     )
-    .first()
-)
 
     if cached_summary:
         return CaseSummaryResponse(**cached_summary.response)
 
-       
-    # Formulating the explicit role instruction
-    completion = client.chat.completions.create(
-        model = GROQ_MODEL,
-        messages = [
-            {
-                "role":"system",
-                "content":CASE_SUMMARY_SYSTEM_PROMPT
-            },
-            {
-                "role":"user",
-                "content":case_context
-            }
-        ],
-        temperature = 0.2,
+    # try/exception block to catch error 
+    try:
+        # Formulating the explicit role instruction
+        completion = client.chat.completions.create(
+            model = GROQ_MODEL,
+            messages = [
+                {
+                    "role":"system",
+                    "content":CASE_SUMMARY_SYSTEM_PROMPT
+                },
+                {
+                    "role":"user",
+                    "content":case_context
+                }
+            ],
+            temperature = 0.2,
 
-        response_format = {"type":"json_object"}
-    )
+            response_format = {"type":"json_object"}
+        )
+    except Exception as e:
+        print("GROQ Error: ",str(e))
+        raise RuntimeError("AI service is currently unavailable.")
 
+    # Protecting JSON payload
+    try:
+        # Extract JSON payload string response
+        json_string = completion.choices[0].message.content
 
-    # Extract JSON payload string response
-    json_string = completion.choices[0].message.content
+        # parsed data
+        parsed_data = json.loads(json_string)
 
-    # parsed data
-    parsed_data = json.loads(json_string)
+    except (json.JSONDecodeError,AttributeError,IndexError,TypeError) as e:
+        print("AI ERROR JSON: ",str(e))
+        raise RuntimeError("AI returned an invalid response.")
 
-    # Push data dictionary onto pydantic validator model
-    validated_response = CaseSummaryResponse(**parsed_data)
+    try:
+        # Push data dictionary onto pydantic validator model
+        validated_response = CaseSummaryResponse(**parsed_data)
+    except ValidationError as e:
+        print("AI Validation Error",str(e))
+        raise RuntimeError("AI returned an invalid response data.")
 
     # Cache Insertion Phase
     new_analysis = AIAnalysis(
@@ -112,11 +126,14 @@ def generate_case_summary(case_id: int,db:Session) -> CaseSummaryResponse:
         model=GROQ_MODEL
     )
 
-    db.add(new_analysis)
-
-    db.commit()
-
-    db.refresh(new_analysis)
+    try:
+        db.add(new_analysis)
+        db.commit()
+        db.refresh(new_analysis)
+    except SQLAlchemyError as e:
+        db.rollback()
+        print("DATABASE ERROR: ",str(e))
+        raise RuntimeError("AI Analysis could not be saved.")
 
     return validated_response
 
