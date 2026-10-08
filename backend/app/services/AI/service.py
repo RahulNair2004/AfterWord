@@ -8,6 +8,8 @@ from app.services.AI.prompts import CASE_SUMMARY_SYSTEM_PROMPT, EVIDENCE_ANALYSI
 from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse, InvestigationAssistantResponse, InvestigationAssistantRequest, ParadoxMessage, ParadoxAIResponse
 from app.models.ai import AIAnalysis
 from app.db.database import get_db
+from app.models.evidence import Evidence
+from app.models.theory import Theory
 
 # Load variables from .env files
 
@@ -120,12 +122,34 @@ def generate_case_summary(case_id: int,db:Session) -> CaseSummaryResponse:
 
 def generate_evidence_analysis(evidence_id: int, db: Session) -> EvidenceAnalysisResponse:
 
+    evidence = (
+        db.query(Evidence)
+        .filter(Evidence.id == evidence_id)
+        .first()
+    )
+
+    if not evidence:
+        raise ValueError(f"Evidence with ID {evidence_id} was not found.")
+
+    
     # Calling the context builder for evidence analysis
     evidence_context = build_evidence_ai_context(evidence_id=evidence_id, db=db)
 
     # Stop if context layer has empty srtings
     if not evidence_context:
         raise ValueError(f"Evidence with ID {evidence_id} was not found.")
+
+    cached_analysis = (
+        db.query(AIAnalysis)
+        .filter(
+            AIAnalysis.evidence_id == evidence_id,
+            AIAnalysis.analysis_type == "evidence_analysis"
+        )
+        .first()
+    )
+
+    if cached_analysis:
+        return EvidenceAnalysisResponse(**cached_analysis.response)
 
     # The LLM chat completion call
     completion = client.chat.completions.create(
@@ -145,11 +169,35 @@ def generate_evidence_analysis(evidence_id: int, db: Session) -> EvidenceAnalysi
     parsed_data = json.loads(json_string)
 
     # Validating the parsed data 
+    print("CACHE HIT - RETURNING SAVED Evidence ANALYSIS")
     validated_response  = EvidenceAnalysisResponse(**parsed_data)
 
+    new_analysis = AIAnalysis(
+        case_id=evidence.case_id,
+        evidence_id=evidence_id,
+        theory_id=None,
+        analysis_type="evidence_analysis",
+        response=validated_response.model_dump(),
+        model=GROQ_MODEL
+    )
+
+    db.add(new_analysis)
+    db.commit()
+    db.refresh(new_analysis)
+ 
     return validated_response
 
 def generate_theory_analysis(theory_id: int, db: Session) -> TheoryAnalysisResponse:
+
+    # Fetching theory from the db
+    theory = (
+        db.query(Theory)
+        .filter(Theory.id == theory_id)
+        .first()
+    )
+    # if empty raise error
+    if not theory:
+        raise ValueError(f"Theory with ID {theory_id} was not found.")
 
     # Calling the context builder for theory analysis
     theory_context = build_theory_ai_context(theory_id = theory_id, db = db)
@@ -158,6 +206,21 @@ def generate_theory_analysis(theory_id: int, db: Session) -> TheoryAnalysisRespo
     if not theory_context:
         raise ValueError(f"Theory with ID {theory_id} was not found.")
 
+    # Cache integration
+    cached_analysis = (
+        db.query(AIAnalysis)
+        .filter(
+            AIAnalysis.theory_id == theory_id,
+            AIAnalysis.analysis_type == "theory_analysis"
+        )
+        .first()
+    )
+
+    # If cache exists return same response
+    if cached_analysis:
+        return TheoryAnalysisResponse(**cached_analysis.response)
+
+    
     # LLM chat ccompletion call
     completion = client.chat.completions.create(
         model = GROQ_MODEL,
@@ -176,7 +239,23 @@ def generate_theory_analysis(theory_id: int, db: Session) -> TheoryAnalysisRespo
     parsed_string = json.loads(json_string)
 
     # Validating the parsed string
+    print("CACHE HIT - RETURNING SAVED THEORY ANALYSIS")
     validated_response = TheoryAnalysisResponse(**parsed_string)
+
+    # Instantiate new analysis for theory 
+    new_analysis = AIAnalysis(
+        case_id=theory.case_id,
+        evidence_id=None,
+        theory_id=theory_id,
+        analysis_type="theory_analysis",
+        response=validated_response.model_dump(),
+        model=GROQ_MODEL
+    )
+
+    # Add the new instiated analyses into the db
+    db.add(new_analysis)
+    db.commit()
+    db.refresh(new_analysis)
 
     return validated_response
 
