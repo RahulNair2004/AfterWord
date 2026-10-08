@@ -168,26 +168,39 @@ def generate_evidence_analysis(evidence_id: int, db: Session) -> EvidenceAnalysi
     if cached_analysis:
         return EvidenceAnalysisResponse(**cached_analysis.response)
 
-    # The LLM chat completion call
-    completion = client.chat.completions.create(
-        model = GROQ_MODEL,
-        messages = [
-            {"role": "system", "content": EVIDENCE_ANALYSIS_SYSTEM_PROMPT},
-            {"role": "user", "content": evidence_context}
-        ],
-        temperature = 0.2,
-        response_format = {"type":"json_object"}
-    )
+    try:
+        # The LLM chat completion call
+        completion = client.chat.completions.create(
+            model = GROQ_MODEL,
+            messages = [
+                {"role": "system", "content": EVIDENCE_ANALYSIS_SYSTEM_PROMPT},
+                {"role": "user", "content": evidence_context}
+            ],
+            temperature = 0.2,
+            response_format = {"type":"json_object"}
+        )
 
-    # Extracting the JSON payload response
-    json_string = completion.choices[0].message.content
+    except Exception as e:
+        print("GROQ ERROR: ",str(e))
+        raise RuntimeError("AI service is currently unavailable.")
 
-    # Parsing the JSON string 
-    parsed_data = json.loads(json_string)
+    try:
+        # Extracting the JSON payload response
+        json_string = completion.choices[0].message.content
 
-    # Validating the parsed data 
-    print("CACHE HIT - RETURNING SAVED Evidence ANALYSIS")
-    validated_response  = EvidenceAnalysisResponse(**parsed_data)
+        # Parsing the JSON string 
+        parsed_data = json.loads(json_string)
+
+    except (json.JSONDecodeError,AttributeError,IndexError,TypeError) as e:
+        print("AI Run Error",str(e))
+        raise RuntimeError("AI returned an invalid response.")
+
+    try:
+        # Validating the parsed data 
+        validated_response  = EvidenceAnalysisResponse(**parsed_data)
+    except ValidationError as e:
+        print("AI VALIDATION ERROR:",str(e))
+        raise RuntimeError("AI returned an invalid response format.")
 
     new_analysis = AIAnalysis(
         case_id=evidence.case_id,
@@ -198,10 +211,15 @@ def generate_evidence_analysis(evidence_id: int, db: Session) -> EvidenceAnalysi
         model=GROQ_MODEL
     )
 
-    db.add(new_analysis)
-    db.commit()
-    db.refresh(new_analysis)
- 
+    try:
+        db.add(new_analysis)
+        db.commit()
+        db.refresh(new_analysis)
+    except SQLAlchemyError as e:
+        db.rollback()
+        print("DATABASE ERROR:", str(e))
+        raise RuntimeError("AI analysis could not be saved.")
+
     return validated_response
 
 def generate_theory_analysis(theory_id: int, db: Session) -> TheoryAnalysisResponse:
@@ -237,27 +255,39 @@ def generate_theory_analysis(theory_id: int, db: Session) -> TheoryAnalysisRespo
     if cached_analysis:
         return TheoryAnalysisResponse(**cached_analysis.response)
 
-    
-    # LLM chat ccompletion call
-    completion = client.chat.completions.create(
-        model = GROQ_MODEL,
-        messages = [
-            {"role":"system","content":THEORY_ANALYSIS_SYSTEM_PROMPT},
-            {"role":"user","content":theory_context}
-        ],
-        temperature = 0.2,
-        response_format = {"type":"json_object"}
-    )
+    try:
+        # LLM chat ccompletion call
+        completion = client.chat.completions.create(
+            model = GROQ_MODEL,
+            messages = [
+                {"role":"system","content":THEORY_ANALYSIS_SYSTEM_PROMPT},
+                {"role":"user","content":theory_context}
+            ],
+            temperature = 0.2,
+            response_format = {"type":"json_object"}
+        )
+    except Exception as e:
+        print("GROQ ERROR:",str(e))
+        raise RuntimeError("AI currently unavailable.")
 
-    # Extracting the JSON payload response
-    json_string  = completion.choices[0].message.content
+    try:
+        # Extracting the JSON payload response
+        json_string  = completion.choices[0].message.content
 
-    # Parsing the JSON string
-    parsed_string = json.loads(json_string)
+        # Parsing the JSON string
+        parsed_string = json.loads(json_string)
+    except (json.JSONDecodeError,AttributeError,TypeError,IndexError) as e:
+        print("AI JSON ERROR:",str(e))
+        raise RuntimeError("AI returned an invalid response.")
 
-    # Validating the parsed string
-    print("CACHE HIT - RETURNING SAVED THEORY ANALYSIS")
-    validated_response = TheoryAnalysisResponse(**parsed_string)
+
+    try:
+        # Validating the parsed string
+        validated_response = TheoryAnalysisResponse(**parsed_string)
+    except ValidationError as e:
+        print("AI Validation ERROR",str(e))
+        raise RuntimeError("AI returned an invalid response.")
+
 
     # Instantiate new analysis for theory 
     new_analysis = AIAnalysis(
@@ -269,10 +299,16 @@ def generate_theory_analysis(theory_id: int, db: Session) -> TheoryAnalysisRespo
         model=GROQ_MODEL
     )
 
-    # Add the new instiated analyses into the db
-    db.add(new_analysis)
-    db.commit()
-    db.refresh(new_analysis)
+    try:
+
+        # Add the new instiated analyses into the db
+        db.add(new_analysis)
+        db.commit()
+        db.refresh(new_analysis)
+    except SQLAlchemyError as e:
+        db.rollback()
+        print("DATABASE ERROR:",str(e))
+        raise RuntimeError("AI analysis cannot be saved.")
 
     return validated_response
 
@@ -286,27 +322,41 @@ def generate_investigation_assistant(case_id: int, question: str, db: Session) -
         raise ValueError(f"Case with ID {case_id} not found.")
 
     
+    try:
+        completion = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+            {"role": "system", "content": INVESTIGATION_ASSISTANT_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"Case context:\n{investigation_context}\n\n"
+                    f"Investigator question:\n{question}"
+                )
+            }
+        ],
+            temperature=0.2,
+            response_format={"type": "json_object"}
+        )
+    except Exception as e:
+        print("GROQ ERROR:",str(e))
+        raise RuntimeError("AI service is unavailable.")
 
-    completion = client.chat.completions.create(
-        model=GROQ_MODEL,
-        messages=[
-        {"role": "system", "content": INVESTIGATION_ASSISTANT_SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                f"Case context:\n{investigation_context}\n\n"
-                f"Investigator question:\n{question}"
-            )
-        }
-    ],
-        temperature=0.2,
-        response_format={"type": "json_object"}
-    )
+    try:
+        json_string = completion.choices[0].message.content
+        parsed_data = json.loads(json_string)
 
-    json_string = completion.choices[0].message.content
-    parsed_data = json.loads(json_string)
-    validated_response = InvestigationAssistantResponse(**parsed_data)
+    except (json.JSONDecodeError,AttributeError,TypeError,IndexError) as e:
+        print("AI JSON ERROR:",str(e))
+        raise RuntimeError("AI returned an invalid response.")
 
+    try:
+        validated_response = InvestigationAssistantResponse(**parsed_data)
+    except ValidationError as e:
+        print("Validation Error:",str(e))
+        raise RuntimeError("AI returned an invalid response.")
+
+    
     return validated_response
 
 def generate_paradox_ai(case_id: int,messages: list[ParadoxMessage],db: Session) -> ParadoxAIResponse:
@@ -318,24 +368,38 @@ def generate_paradox_ai(case_id: int,messages: list[ParadoxMessage],db: Session)
     if not paradox_context:
         raise ValueError(f"Case with ID {case_id} not found.")    
 
-    completion = client.chat.completions.create(
-        model = GROQ_MODEL,
-        messages = [
-            {"role":"system","content":PARADOX_AI_SYSTEM_PROMPT},
-            {"role":"user","content":paradox_context}
-        ],
-        temperature =0.2,
-        response_format = {"type":"json_object"}
-    )
 
-    # Extracting the JSON payload response
-    json_string = completion.choices[0].message.content
+    try:
+        completion = client.chat.completions.create(
+            model = GROQ_MODEL,
+            messages = [
+                {"role":"system","content":PARADOX_AI_SYSTEM_PROMPT},
+                {"role":"user","content":paradox_context}
+            ],
+            temperature =0.2,
+            response_format = {"type":"json_object"}
+        )
+    except Exception as e:
+        print("GROQ ERROR:",str(e))
+        raise RuntimeError("AI server is currently unavailable.")
 
-    # Parsing the JSON string
-    parsed_data = json.loads(json_string)
+    try:
+        # Extracting the JSON payload response
+        json_string = completion.choices[0].message.content
 
-    # Validating the parsed string 
-    validated_response = ParadoxAIResponse(**parsed_data)
+        # Parsing the JSON string
+        parsed_data = json.loads(json_string)
+    except (json.JSONDecodeError,AttributeError,IndexError,TypeError) as e:
+        print("AI JSON is error",str(e))
+        raise RuntimeError("AI returned an invalid response.")
+
+    try:
+        # Validating the parsed string 
+        validated_response = ParadoxAIResponse(**parsed_data)
+    except ValidationError as e:
+        print("AI Validation ERROR:",str(e))
+        raise RuntimeError("AI returned an invalid response.")
+    
     return validated_response
 
 
