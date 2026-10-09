@@ -1,17 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
+from typing import Annotated
+from pydantic import Field
 from app.db.database import get_db
 from app.services.AI.service import generate_case_summary, generate_evidence_analysis, generate_theory_analysis, generate_investigation_assistant, generate_paradox_ai
 from app.services.AI.schemas import CaseSummaryResponse, EvidenceAnalysisResponse, TheoryAnalysisResponse, InvestigationAssistantRequest, InvestigationAssistantResponse, ParadoxMessage, ParadoxAIResponse
-
+from app.auth.dependencies import get_current_user
+from app.models import User
 
 # Initialize router 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
 # Defining endpoints for ai-generated case summaries
 @router.get("/cases/{case_id}/summary", response_model=CaseSummaryResponse)
-def get_case_summary(case_id: int, db: Session = Depends(get_db)):
+def get_case_summary(case_id: int, db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
     
 
     try:
@@ -41,7 +43,7 @@ def get_case_summary(case_id: int, db: Session = Depends(get_db)):
 
 # Defining endpoints for ai-generated evidence analysis
 @router.get("/evidence/{evidence_id}/analysis",response_model=EvidenceAnalysisResponse)
-def get_evidence_analysis(evidence_id:int,db:Session = Depends(get_db)):
+def get_evidence_analysis(evidence_id:int,db:Session = Depends(get_db), current_user: User = Depends(get_current_user)):
 
     try:
         # Offloading structured logic to this layer
@@ -69,7 +71,7 @@ def get_evidence_analysis(evidence_id:int,db:Session = Depends(get_db)):
 
 # Defining endpoints for ai-generated theory analysis
 @router.get("/theories/{theory_id}/analysis",response_model = TheoryAnalysisResponse)
-def get_theory_analysis(theory_id:int,db:Session = Depends(get_db)):
+def get_theory_analysis(theory_id:int,db:Session = Depends(get_db), current_user: User = Depends(get_current_user)):
 
     try:
         # Offloading structured logic to this layer
@@ -95,7 +97,7 @@ def get_theory_analysis(theory_id:int,db:Session = Depends(get_db)):
 
 # Defining the endpoint for ai-generated investigation analysis
 @router.post("/cases/{case_id}/assistant",response_model = InvestigationAssistantResponse)
-def get_investigation_assistant(case_id: int,payload: InvestigationAssistantRequest, db:Session = Depends(get_db)):
+def get_investigation_assistant(case_id: int,payload: InvestigationAssistantRequest, db:Session = Depends(get_db),current_user: User = Depends(get_current_user)):
 
     try:
         # Structuring the context logic to this layer
@@ -121,7 +123,7 @@ def get_investigation_assistant(case_id: int,payload: InvestigationAssistantRequ
 
 # Defining the endpoints for paradox ai analysis
 @router.post("/cases/{case_id}/paradox",response_model = ParadoxAIResponse)
-def get_paradox_ai(case_id: int, messages: list[ParadoxMessage], db:Session = Depends(get_db)):
+def get_paradox_ai(case_id: int, messages: Annotated[list[ParadoxMessage],Field(...,min_length = 1,max_length=20)], db:Session = Depends(get_db),current_user: User = Depends(get_current_user)):
 
     try:
         # Structuring the context logic to this layer

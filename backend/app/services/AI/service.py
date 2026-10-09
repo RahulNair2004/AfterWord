@@ -12,8 +12,8 @@ from app.models.evidence import Evidence
 from app.models.theory import Theory
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
-# Load variables from .env files
 
+# Load variables from .env files
 load_dotenv()
 
 # Loading the environment parameters
