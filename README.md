@@ -38,7 +38,7 @@ Reconsider
 **Frontend:** React, Tailwind CSS
 **Backend:** FastAPI, Python
 **Database:** PostgreSQL
-**AI/ML:** Python, LLMs, NLP
+**AI/ML:** Python, LLM
 **Infrastructure:** Docker, AWS
 
 ## Project Structure
