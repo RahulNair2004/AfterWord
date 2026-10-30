@@ -1,39 +1,24 @@
-import React from 'react'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import Home from './pages/Home'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import ExploreCases from './pages/ExploreCases'
-import CaseDetails from './pages/CaseDetails'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <Home/>
-  },
-  {
-    path:'/login',
-    element:<Login/>,
-  },
-  {
-    path:'/register',
-    element:<Register/>,
-  },
-  {
-    path:'/cases',
-    element:<ExploreCases/>,
-  },
-  {
-    path: '/cases/:caseId',
-    element: <CaseDetails/>,
-  },
-]);
+import MainLayout from "./layouts/MainLayout";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import ExploreCases from "./pages/ExploreCases";
+import CaseDetails from "./pages/CaseDetails";
 
-
-const App = () => {
+export default function App() {
   return (
-    <RouterProvider router={router}/>
-  )
+    <BrowserRouter>
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/cases" element={<ExploreCases />} />
+          <Route path="/cases/:caseId" element={<CaseDetails />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
-
-export default App
