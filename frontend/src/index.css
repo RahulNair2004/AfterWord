@@ -1,1 +1,94 @@
+/* ---- Fonts (must stay first) ---- */
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=Playfair+Display:ital,wght@0,400..800;1,400..800&family=Caveat:wght@500;600&display=swap");
+
 @import "tailwindcss";
+
+:root {
+  --background: #f7f5ef;
+  --background-secondary: #eeece3;
+  --surface: #ffffff;
+  --surface-soft: #f0eee6;
+
+  --primary: #244c3b;
+  --primary-dark: #19382b;
+
+  --accent: #d87548;
+  --accent-soft: #f2dccf;
+
+  --text-primary: #242923;
+  --text-secondary: #686d64;
+  --text-muted: #8b8e84; /* slightly darker than #92958B for AA contrast on ivory */
+
+  --border: #e3e0d6;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: "DM Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--primary-dark);
+}
+
+/* ---- Font helpers (no tailwind.config changes needed) ---- */
+.font-playfair { font-family: "Playfair Display", Georgia, serif; }
+.font-dmserif  { font-family: "DM Serif Display", Georgia, serif; }
+.font-hand     { font-family: "Caveat", "Bradley Hand", cursive; }
+
+/* ---- Paper texture (cheap: static tint, no filters) ---- */
+.paper { position: relative; background-image: radial-gradient(rgba(36,41,35,.035) 1px, transparent 1px); background-size: 6px 6px; }
+.grain { position: relative; background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px); background-size: 6px 6px; }
+
+/* ---- Hand-drawn line reveal (CSS only, runs once) ---- */
+.draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.1s ease-in-out var(--d, 0s) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+/* ---- Animated underline for nav links ---- */
+.nav-link {
+  position: relative;
+  display: inline-block;
+  transition: color 0.3s ease;
+}
+.nav-link::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  height: 1.5px;
+  width: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-link:hover::before,
+.nav-link.is-active::before {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+/* ---- Focus + reduced motion ---- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
